@@ -92,9 +92,9 @@ async function sendRating(isUp) {
 
     // After rating, update both the recommendation and (if visible) the t-SNE plot
     await loadNextMovie();
-    if (researchVisible) {
-      await refreshTsnePlot();
-    }
+    // if (researchVisible) {
+    //   await refreshTsnePlot();
+    // }
   } catch (err) {
     showAlert(err.data?.detail || err.message, 'danger');
   }
@@ -106,10 +106,15 @@ async function fetchTsneSpace() {
   return apiFetch('/movies/space', { method: 'GET' });
 }
 
-function buildTsneDataset(space) {
+async function buildTsneDataset(space, influence) {
+  // const influence = await fetchInfluenceForCurrentMovie();
+  const influentialIds = influence.map(i => i.movie_id);
+  updateInfluenceSidebar(influence);
+
   const liked = [];
   const disliked = [];
   const unseen = [];
+  const influentialPoints = [];
   let currentMoviePoint = null;
 
   for (const p of space.points) {
@@ -124,6 +129,12 @@ function buildTsneDataset(space) {
       currentMoviePoint = basePoint;
       continue;
     }
+
+    if (influentialIds.includes(p.id)) {
+      influentialPoints.push({ ...basePoint, rating: p.rating });
+      continue;
+    }
+
 
     if (p.rating === true) {
       liked.push(basePoint);
@@ -160,13 +171,66 @@ function buildTsneDataset(space) {
     };
   }
 
-  return { liked, disliked, unseen, userDataset, currentMovieDataset };
+  return { liked, disliked, unseen, influentialPoints, userDataset, currentMovieDataset };
 }
 
-function createOrUpdateTsneChart(space) {
+async function createOrUpdateTsneChart(space, influence) {
   const ctx = document.getElementById('tsne-canvas').getContext('2d');
-  const { liked, disliked, unseen, userDataset, currentMovieDataset } =
-  buildTsneDataset(space);
+  const { liked, disliked, unseen, influentialPoints, userDataset, currentMovieDataset } = await buildTsneDataset(space, influence);
+
+
+  // Compute preference cluster circle
+  let prefCircle = null;
+
+  if (influence && influence.length > 0) {
+    const inflCoords = [];
+    for (const item of influence) {
+      const pt = space.points.find(p => p.id === item.movie_id);
+      if (pt) inflCoords.push([pt.x, pt.y]);
+    }
+
+    if (inflCoords.length > 0) {
+      const cx = inflCoords.reduce((a, p) => a + p[0], 0) / inflCoords.length;
+      const cy = inflCoords.reduce((a, p) => a + p[1], 0) / inflCoords.length;
+
+      // average distance from centroid
+      const radius =
+        inflCoords.reduce((a, p) => a + Math.hypot(p[0] - cx, p[1] - cy), 0) /
+        inflCoords.length;
+
+      prefCircle = { cx, cy, radius: radius * 1.3 }; // expand slightly for looks
+    }
+  }
+
+  const preferenceCirclePlugin = {
+    id: 'preferenceCircle',
+    afterDraw(chart, args, opts) {
+      if (!opts.circle) return;
+
+      const { ctx, chartArea: { left, right, top, bottom } } = chart;
+
+      const xScale = chart.scales.x;
+      const yScale = chart.scales.y;
+
+      const cx = xScale.getPixelForValue(opts.circle.cx);
+      const cy = yScale.getPixelForValue(opts.circle.cy);
+      const r = (xScale.getPixelForValue(opts.circle.cx + opts.circle.radius) - cx);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, Math.abs(r), 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([5, 5]);   // dotted outline
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)'; // subtle fill
+      ctx.fill();
+      ctx.restore();
+    }
+  };
+
+
 
   const datasets = [
     {
@@ -193,6 +257,29 @@ function createOrUpdateTsneChart(space) {
       pointRadius: 4,
       showLine: false,
     },
+    {
+      label: 'Influential movies',
+      data: influentialPoints,
+      pointRadius: 8,  // bigger circles
+
+      // color depends on rating type
+      pointBackgroundColor: (ctx) => {
+        const r = ctx.raw.rating;
+        if (r === true) return 'rgba(0, 180, 0, 1)';      // liked = green
+        if (r === false) return 'rgba(220, 0, 0, 1)';     // disliked = red
+        return 'rgba(128, 128, 128, 0.8)';                // unseen fallback
+      },
+      pointBorderColor: (ctx) => {
+        const r = ctx.raw.rating;
+        if (r === true) return 'rgba(0, 120, 0, 1)';
+        if (r === false) return 'rgba(160, 0, 0, 1)';
+        return 'rgba(80, 80, 80, 1)';
+      },
+
+      showLine: false,
+    }
+
+
   ];
 
   if (currentMovieDataset) {
@@ -209,6 +296,9 @@ function createOrUpdateTsneChart(space) {
     plugins: {
       legend: {
         position: 'top',
+      },
+      preferenceCircle: {
+        circle: prefCircle
       },
       tooltip: {
         callbacks: {
@@ -228,14 +318,14 @@ function createOrUpdateTsneChart(space) {
         type: 'linear',
         title: {
           display: true,
-          text: 't-SNE dimension 1',
+          text: 'UMAP dimension 1',
         },
       },
       y: {
         type: 'linear',
         title: {
           display: true,
-          text: 't-SNE dimension 2',
+          text: 'UMAP dimension 2',
         },
       },
     },
@@ -243,12 +333,14 @@ function createOrUpdateTsneChart(space) {
 
   if (tsneChart) {
     tsneChart.data.datasets = datasets;
+    tsneChart.options.plugins.preferenceCircle.circle = prefCircle;
     tsneChart.update();
   } else {
     tsneChart = new Chart(ctx, {
       type: 'scatter',
       data: { datasets },
       options,
+      plugins: [preferenceCirclePlugin]
     });
   }
 }
@@ -257,9 +349,21 @@ async function refreshTsnePlot() {
   try {
     const space = await fetchTsneSpace();
     if (!space.points || space.points.length === 0) return;
-    createOrUpdateTsneChart(space);
+    const influence = await fetchInfluenceForCurrentMovie();
+    await createOrUpdateTsneChart(space, influence);
   } catch (err) {
     console.error('Failed to load t-SNE space:', err);
+  }
+}
+
+async function fetchInfluenceForCurrentMovie() {
+  if (!currentMovieId) return [];
+
+  try {
+    return await apiFetch(`/movies/influence?movie_id=${currentMovieId}`, { method: "GET" });
+  } catch (err) {
+    console.error("Influence fetch failed", err);
+    return [];
   }
 }
 
@@ -304,3 +408,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await loadNextMovie();
 });
+
+function updateInfluenceSidebar(influence) {
+  const panel = document.getElementById("influence-panel");
+  const list = document.getElementById("influence-list");
+
+  if (!influence || influence.length === 0) {
+    panel.classList.add("d-none");
+    return;
+  }
+
+  panel.classList.remove("d-none");
+  list.innerHTML = "";
+
+  for (const item of influence) {
+    const li = document.createElement("li");
+    li.className = "list-group-item d-flex justify-content-between align-items-center";
+
+    const sign = item.influence >= 0 ? "👍" : "👎";
+    const magnitude = Math.abs(item.influence).toFixed(3);
+
+    li.innerHTML = `
+      <span>${item.movie_title}</span>
+      <span class="badge bg-${item.influence >= 0 ? "success" : "danger"}">
+        ${sign} ${magnitude}
+      </span>
+    `;
+    list.appendChild(li);
+  }
+}
