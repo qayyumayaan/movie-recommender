@@ -1,4 +1,5 @@
 let currentMovieId = null;
+let currentMode = 'random'; // 'random' | 'smart'
 
 function showAlert(message, type = 'info') {
   const alertEl = document.getElementById('alert');
@@ -26,7 +27,22 @@ function setButtonsEnabled(enabled) {
   document.getElementById('btn-down').disabled = !enabled;
 }
 
-async function loadRandomMovie() {
+function updateModeToggleUI() {
+  const btn = document.getElementById('mode-toggle');
+  if (!btn) return;
+
+  if (currentMode === 'random') {
+    btn.textContent = 'Random';
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-outline-secondary');
+  } else {
+    btn.textContent = 'Smart';
+    btn.classList.remove('btn-outline-secondary');
+    btn.classList.add('btn-primary');
+  }
+}
+
+async function loadNextMovie() {
   const titleEl = document.getElementById('movie-title');
   const statusText = document.getElementById('status-text');
   statusText.textContent = '';
@@ -34,7 +50,9 @@ async function loadRandomMovie() {
   setButtonsEnabled(false);
 
   try {
-    const movie = await apiFetch('/movies/random', { method: 'GET' });
+    const movie = await apiFetch(`/movies/random?mode=${currentMode}`, {
+      method: 'GET',
+    });
     currentMovieId = movie.id;
     titleEl.textContent = movie.title;
     setButtonsEnabled(true);
@@ -60,7 +78,7 @@ async function sendRating(isUp) {
       body: JSON.stringify({ movie_id: currentMovieId, rating: isUp }),
     });
     statusText.textContent = 'Rating saved! Fetching next movie...';
-    await loadRandomMovie();
+    await loadNextMovie();
   } catch (err) {
     showAlert(err.data?.detail || err.message, 'danger');
   }
@@ -73,5 +91,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-up').addEventListener('click', () => sendRating(true));
   document.getElementById('btn-down').addEventListener('click', () => sendRating(false));
 
-  await loadRandomMovie();
+  const modeToggle = document.getElementById('mode-toggle');
+  if (modeToggle) {
+    modeToggle.addEventListener('click', async () => {
+      currentMode = currentMode === 'random' ? 'smart' : 'random';
+      updateModeToggleUI();
+      await loadNextMovie();
+    });
+  }
+
+  updateModeToggleUI();
+  await loadNextMovie();
 });
