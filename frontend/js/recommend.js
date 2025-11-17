@@ -110,13 +110,21 @@ function buildTsneDataset(space) {
   const liked = [];
   const disliked = [];
   const unseen = [];
+  let currentMoviePoint = null;
 
   for (const p of space.points) {
     const basePoint = {
       x: p.x,
       y: p.y,
-      movieTitle: p.title,
+      movieTitle: p.title
     };
+
+    // Check if this point is the current movie
+    if (p.id === currentMovieId) {
+      currentMoviePoint = basePoint;
+      continue;
+    }
+
     if (p.rating === true) {
       liked.push(basePoint);
     } else if (p.rating === false) {
@@ -139,12 +147,26 @@ function buildTsneDataset(space) {
     };
   }
 
-  return { liked, disliked, unseen, userDataset };
+  let currentMovieDataset = null;
+  if (currentMoviePoint) {
+    currentMovieDataset = {
+      label: 'Current movie',
+      data: [currentMoviePoint],
+      pointBackgroundColor: 'yellow',
+      pointBorderColor: 'orange',
+      pointRadius: 8,
+      pointStyle: 'circle',
+      showLine: false,
+    };
+  }
+
+  return { liked, disliked, unseen, userDataset, currentMovieDataset };
 }
 
 function createOrUpdateTsneChart(space) {
   const ctx = document.getElementById('tsne-canvas').getContext('2d');
-  const { liked, disliked, unseen, userDataset } = buildTsneDataset(space);
+  const { liked, disliked, unseen, userDataset, currentMovieDataset } =
+  buildTsneDataset(space);
 
   const datasets = [
     {
@@ -172,6 +194,10 @@ function createOrUpdateTsneChart(space) {
       showLine: false,
     },
   ];
+
+  if (currentMovieDataset) {
+    datasets.push(currentMovieDataset);
+  }
 
   if (userDataset) {
     datasets.push(userDataset);
