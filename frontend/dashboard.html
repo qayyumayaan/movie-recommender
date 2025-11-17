@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Movie Recommender - Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  >
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+      <span class="navbar-brand">Movie Recommender</span>
+      <div class="d-flex">
+        <button id="btn-logout" class="btn btn-outline-light btn-sm">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h3>Dashboard</h3>
+        <p id="user-info" class="text-muted mb-0"></p>
+      </div>
+      <div>
+        <a href="recommend.html" class="btn btn-primary me-2">Get Recommendation</a>
+        <button id="btn-reset" class="btn btn-outline-danger">Reset History</button>
+      </div>
+    </div>
+
+    <div id="alert" class="alert d-none" role="alert"></div>
+
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Rated Movies</h5>
+        <div class="table-responsive">
+          <table class="table table-striped" id="history-table">
+            <thead>
+              <tr>
+                <th>Movie</th>
+                <th>Rating</th>
+                <th>Rated At</th>
+              </tr>
+            </thead>
+            <tbody id="history-body">
+              <!-- rows injected by dashboard.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
