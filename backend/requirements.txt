@@ -9,3 +9,5 @@ pgvector
 pydantic[email]
 python-dotenv
 sentence-transformers
+numpy
+scikit-learn
