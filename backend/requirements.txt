@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+SQLAlchemy>=1.4
+psycopg2-binary
+python-jose[cryptography]
+bcrypt==4.1.2
+passlib[bcrypt]
+pgvector
+pydantic[email]
+python-dotenv
+sentence-transformers
