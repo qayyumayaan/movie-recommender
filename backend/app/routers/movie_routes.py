@@ -8,7 +8,8 @@ from .. import models, schemas, auth
 from ..database import get_db
 
 import numpy as np
-from sklearn.manifold import TSNE
+# from sklearn.manifold import TSNE
+import umap
 from typing import Optional, List
 TSNE_CACHE = {}  
 
@@ -211,24 +212,26 @@ def reset_history(
     db.commit()
     return {"detail": "History reset"}
 
+TSNE_CACHE = {}   # global cache: stores UMAP, movie projections, etc.
+
+
 @router.get("/space")
 def movie_space(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
     """
-    Returns a 2D t-SNE embedding for all movies, plus the current user's preference
-    vector projected into the same space. Also includes whether each movie has been
-    liked/disliked/unseen by this user.
+    Returns 2D UMAP embeddings for all movies + the user's preference vector.
+    Uses a global cache so UMAP is computed only once for the lifetime of the server.
     """
+    # ---- Step 1: Fetch all movies ----
     movies = db.query(models.Movie).all()
     if not movies:
         return {"points": [], "user_point": None}
 
-    # Collect embeddings and ids
-    movie_ids: List[int] = []
-    movie_titles: List[str] = []
-    embs: List[List[float]] = []
+    movie_ids = []
+    movie_titles = []
+    embs = []
 
     for m in movies:
         if m.embedding is None:
@@ -241,58 +244,115 @@ def movie_space(
         return {"points": [], "user_point": None}
 
     X = np.array(embs, dtype=float)
+    num_movies = X.shape[0]
 
-    # User profile vector
+    # ---- Step 2: If cache is missing or stale, rebuild UMAP ----
+    cache_key = "umap"
+
+    need_rebuild = (
+        cache_key not in TSNE_CACHE
+        or TSNE_CACHE[cache_key]["num_movies"] != num_movies
+    )
+
+    if need_rebuild:
+        # Train UMAP one single time
+        reducer = umap.UMAP(
+            n_components=2,
+            n_neighbors=400,
+            min_dist=0.1,
+            metric="cosine",
+            random_state=42,
+        )
+        movie_coords = reducer.fit_transform(X)
+
+        TSNE_CACHE[cache_key] = {
+            "reducer": reducer,
+            "movie_coords": movie_coords,
+            "movie_ids": movie_ids,
+            "movie_titles": movie_titles,
+            "X": X,                # original embeddings
+            "num_movies": num_movies,
+        }
+    else:
+        reducer = TSNE_CACHE[cache_key]["reducer"]
+        movie_coords = TSNE_CACHE[cache_key]["movie_coords"]
+        movie_ids = TSNE_CACHE[cache_key]["movie_ids"]
+        movie_titles = TSNE_CACHE[cache_key]["movie_titles"]
+
+    # ---- Step 3: Compute user vector and project it through cached UMAP ----
     user_profile = compute_user_profile_vector(db, current_user.id)
 
-    # Build matrix for t-SNE (movies plus user profile if available)
     if user_profile is not None:
-        X_all = np.vstack([X, np.array(user_profile, dtype=float)])
-        include_user = True
+        # UMAP transform – very fast (no retraining!)
+        user_vec = np.array(user_profile, dtype=float)
+        user_2d = reducer.transform([user_vec])[0]
+        user_point = {"x": float(user_2d[0]), "y": float(user_2d[1])}
     else:
-        X_all = X
-        include_user = False
-
-    n_samples = X_all.shape[0]
-    # t-SNE needs perplexity < n_samples
-    perplexity = min(50, max(5, n_samples - 1))
-
-    tsne = TSNE(
-        n_components=2,
-        perplexity=perplexity,
-        learning_rate="auto",
-        init="random",
-        random_state=42,
-    )
-    Y_all = tsne.fit_transform(X_all)
-
-    if include_user:
-        movie_coords = Y_all[:-1]
-        user_coord = Y_all[-1]
-        user_point = {"x": float(user_coord[0]), "y": float(user_coord[1])}
-    else:
-        movie_coords = Y_all
         user_point = None
 
-    # Get user ratings to color points
+    # ---- Step 4: Color coding: liked, disliked, unseen ----
     ratings = (
         db.query(models.Rating)
         .filter(models.Rating.user_id == current_user.id)
         .all()
     )
-    rating_map = {r.movie_id: r.rating for r in ratings}  # True/False
+    rating_map = {r.movie_id: r.rating for r in ratings}
 
     points = []
-    for (mid, title, coord) in zip(movie_ids, movie_titles, movie_coords):
+    for mid, title, coord in zip(movie_ids, movie_titles, movie_coords):
         rating = rating_map.get(mid, None)
-        points.append(
-            {
-                "id": mid,
-                "title": title,
-                "x": float(coord[0]),
-                "y": float(coord[1]),
-                "rating": rating,  # true / false / null
-            }
-        )
+        points.append({
+            "id": mid,
+            "title": title,
+            "x": float(coord[0]),
+            "y": float(coord[1]),
+            "rating": rating,
+        })
 
     return {"points": points, "user_point": user_point}
+
+@router.get("/influence")
+def movie_influence(
+    movie_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    # Fetch the current recommended movie
+    target_movie = db.query(models.Movie).filter(models.Movie.id == movie_id).first()
+    if not target_movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+
+    target_emb = np.array(target_movie.embedding, dtype=float)
+
+    # Fetch all rated movies for the user
+    ratings = (
+        db.query(models.Rating)
+        .options(joinedload(models.Rating.movie))
+        .filter(models.Rating.user_id == current_user.id)
+        .all()
+    )
+
+    influences = []
+
+    for r in ratings:
+        emb = np.array(r.movie.embedding, dtype=float)
+        weight = 1 if r.rating else -1
+
+        # cosine weighted influence
+        influence = float(
+            np.dot(emb * weight, target_emb)
+            / (np.linalg.norm(emb) * np.linalg.norm(target_emb))
+        )
+
+        influences.append({
+            "movie_id": r.movie.id,
+            "movie_title": r.movie.title,
+            "rating": r.rating,
+            "influence": influence,
+        })
+
+    # Sort by descending magnitude of influence
+    influences.sort(key=lambda x: abs(x["influence"]), reverse=True)
+
+    # Return top 5
+    return influences[:5]
