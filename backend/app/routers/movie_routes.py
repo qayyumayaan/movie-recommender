@@ -7,6 +7,11 @@ from sqlalchemy import select, func
 from .. import models, schemas, auth
 from ..database import get_db
 
+import numpy as np
+from sklearn.manifold import TSNE
+from typing import Optional, List
+TSNE_CACHE = {}  
+
 router = APIRouter(prefix="/movies", tags=["movies"])
 
 
@@ -205,3 +210,89 @@ def reset_history(
     db.query(models.Rating).filter(models.Rating.user_id == current_user.id).delete()
     db.commit()
     return {"detail": "History reset"}
+
+@router.get("/space")
+def movie_space(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    Returns a 2D t-SNE embedding for all movies, plus the current user's preference
+    vector projected into the same space. Also includes whether each movie has been
+    liked/disliked/unseen by this user.
+    """
+    movies = db.query(models.Movie).all()
+    if not movies:
+        return {"points": [], "user_point": None}
+
+    # Collect embeddings and ids
+    movie_ids: List[int] = []
+    movie_titles: List[str] = []
+    embs: List[List[float]] = []
+
+    for m in movies:
+        if m.embedding is None:
+            continue
+        movie_ids.append(m.id)
+        movie_titles.append(m.title)
+        embs.append(list(m.embedding))
+
+    if not embs:
+        return {"points": [], "user_point": None}
+
+    X = np.array(embs, dtype=float)
+
+    # User profile vector
+    user_profile = compute_user_profile_vector(db, current_user.id)
+
+    # Build matrix for t-SNE (movies plus user profile if available)
+    if user_profile is not None:
+        X_all = np.vstack([X, np.array(user_profile, dtype=float)])
+        include_user = True
+    else:
+        X_all = X
+        include_user = False
+
+    n_samples = X_all.shape[0]
+    # t-SNE needs perplexity < n_samples
+    perplexity = min(50, max(5, n_samples - 1))
+
+    tsne = TSNE(
+        n_components=2,
+        perplexity=perplexity,
+        learning_rate="auto",
+        init="random",
+        random_state=42,
+    )
+    Y_all = tsne.fit_transform(X_all)
+
+    if include_user:
+        movie_coords = Y_all[:-1]
+        user_coord = Y_all[-1]
+        user_point = {"x": float(user_coord[0]), "y": float(user_coord[1])}
+    else:
+        movie_coords = Y_all
+        user_point = None
+
+    # Get user ratings to color points
+    ratings = (
+        db.query(models.Rating)
+        .filter(models.Rating.user_id == current_user.id)
+        .all()
+    )
+    rating_map = {r.movie_id: r.rating for r in ratings}  # True/False
+
+    points = []
+    for (mid, title, coord) in zip(movie_ids, movie_titles, movie_coords):
+        rating = rating_map.get(mid, None)
+        points.append(
+            {
+                "id": mid,
+                "title": title,
+                "x": float(coord[0]),
+                "y": float(coord[1]),
+                "rating": rating,  # true / false / null
+            }
+        )
+
+    return {"points": points, "user_point": user_point}
