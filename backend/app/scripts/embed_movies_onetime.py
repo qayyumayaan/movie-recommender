@@ -47,7 +47,7 @@ def main():
         original_embeddings = [d.embedding for d in response.data]
         print("Generated embeddings")
 
-        # PCA: Fit on all embeddings
+        # PCA: Fit on all 680 embeddings (one-time global reduction)
         pca_dim = 128
         print(f"Training PCA: 1536 → {pca_dim}")
         pca = PCA(n_components=pca_dim)
