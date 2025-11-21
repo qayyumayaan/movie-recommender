@@ -92,15 +92,12 @@ async function sendRating(isUp) {
 
     // After rating, update both the recommendation and (if visible) the t-SNE plot
     await loadNextMovie();
-    // if (researchVisible) {
-    //   await refreshTsnePlot();
-    // }
   } catch (err) {
     showAlert(err.data?.detail || err.message, 'danger');
   }
 }
 
-// ---- Research View (t-SNE) ----
+// Research View
 
 async function fetchTsneSpace() {
   return apiFetch('/movies/space', { method: 'GET' });
@@ -352,7 +349,7 @@ async function refreshTsnePlot() {
     const influence = await fetchInfluenceForCurrentMovie();
     await createOrUpdateTsneChart(space, influence);
   } catch (err) {
-    console.error('Failed to load t-SNE space:', err);
+    console.error('Failed to load UMAP space:', err);
   }
 }
 
