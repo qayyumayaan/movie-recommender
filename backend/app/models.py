@@ -30,10 +30,9 @@ class Movie(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), unique=True, nullable=False)
-    embedding = Column(Vector(384))  # all-MiniLM-L6-v2 dimension
+    embedding = Column(Vector(128)) 
 
     ratings = relationship("Rating", back_populates="movie", cascade="all, delete-orphan")
-
 
 class Rating(Base):
     __tablename__ = "ratings"
