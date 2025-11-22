@@ -12,3 +12,4 @@ sentence-transformers
 numpy
 scikit-learn
 umap-learn
+openai
