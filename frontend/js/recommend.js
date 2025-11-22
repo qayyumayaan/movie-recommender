@@ -2,6 +2,11 @@ let currentMovieId = null;
 let currentMode = 'random'; // 'random' | 'smart'
 let researchVisible = false;
 let tsneChart = null;
+let ratingCount = 0;
+
+// Keys for one-time notifications
+const LS_KEY_SMART_UNLOCK = "notif_smart_unlocked";
+const LS_KEY_RESEARCH_UNLOCK = "notif_research_unlocked";
 
 function showAlert(message, type = 'info') {
   const alertEl = document.getElementById('alert');
@@ -10,6 +15,28 @@ function showAlert(message, type = 'info') {
   alertEl.textContent = message;
   alertEl.classList.remove('d-none');
 }
+
+function updateUnlockState() {
+  const smartToggle = document.getElementById("mode-toggle");
+  const researchToggle = document.getElementById("btn-research-toggle");
+
+  const smartUnlocked = ratingCount >= 10;
+
+  smartToggle.disabled = !smartUnlocked;
+
+  researchToggle.disabled = !smartUnlocked;
+
+  if (smartUnlocked && !localStorage.getItem(LS_KEY_SMART_UNLOCK)) {
+    showAlert("🎉 Smart suggestion mode is now enabled!", "success");
+    localStorage.setItem(LS_KEY_SMART_UNLOCK, "1");
+  }
+
+  if (smartUnlocked && !localStorage.getItem(LS_KEY_RESEARCH_UNLOCK)) {
+    showAlert("🔬 Research view unlocked!", "info");
+    localStorage.setItem(LS_KEY_RESEARCH_UNLOCK, "1");
+  }
+}
+
 
 async function fetchCurrentUserOrRedirect() {
   try {
@@ -89,8 +116,10 @@ async function sendRating(isUp) {
       body: JSON.stringify({ movie_id: currentMovieId, rating: isUp }),
     });
     statusText.textContent = 'Rating saved! Fetching next movie...';
+    ratingCount++;
+    updateUnlockState();
 
-    // After rating, update both the recommendation and (if visible) the t-SNE plot
+    // After rating, update both the recommendation and (if visible) the UMAP plot
     await loadNextMovie();
   } catch (err) {
     showAlert(err.data?.detail || err.message, 'danger');
@@ -369,6 +398,16 @@ async function fetchInfluenceForCurrentMovie() {
 document.addEventListener('DOMContentLoaded', async () => {
   const user = await fetchCurrentUserOrRedirect();
   if (!user) return;
+
+  // Get user rating count
+  try {
+    const history = await apiFetch('/movies/history', { method: 'GET' });
+    ratingCount = history.length;
+  } catch (e) {
+    ratingCount = 0;
+  }
+
+  updateUnlockState();
 
   // rating buttons
   document.getElementById('btn-up').addEventListener('click', () => sendRating(true));
