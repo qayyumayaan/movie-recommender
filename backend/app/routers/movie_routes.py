@@ -351,8 +351,12 @@ def movie_influence(
             "influence": influence,
         })
 
-    # Sort by descending magnitude of influence
-    influences.sort(key=lambda x: abs(x["influence"]), reverse=True)
+    # Keep positively rated movies
+    positive_influences = [inf for inf in influences if inf["rating"] == True]
+
+    # Sort by highest positive influence
+    positive_influences.sort(key=lambda x: x["influence"], reverse=True)
 
     # Return top 5
-    return influences[:5]
+    return positive_influences[:5]
+
