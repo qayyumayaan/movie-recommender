@@ -12,6 +12,7 @@ engine = create_engine(DATABASE_URL, future=True)
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
+    expire_on_commit=True,
     bind=engine,
     future=True,
 )
