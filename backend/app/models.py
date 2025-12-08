@@ -6,6 +6,7 @@ from sqlalchemy import (
     Boolean,
     ForeignKey,
     func,
+    Float
 )
 from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
@@ -29,8 +30,17 @@ class Movie(Base):
     __tablename__ = "movies"
 
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(255), unique=True, nullable=False)
-    embedding = Column(Vector(128)) 
+    title = Column(String, nullable=False, index=True)
+
+    startYear = Column(Integer)
+    imdb_rating = Column(Float)
+    imdb_votes = Column(Integer)
+
+    overview = Column(String)
+    tmdb_genres = Column(String)
+    poster_path = Column(String)
+
+    embedding = Column(VECTOR(128))  # pgvector 128 dims
 
     ratings = relationship("Rating", back_populates="movie", cascade="all, delete-orphan")
 
