@@ -29,6 +29,12 @@ class UserOut(UserBase):
 class MovieOut(BaseModel):
     id: int
     title: str
+    overview: Optional[str]
+    startYear: Optional[int]
+    imdb_rating: Optional[float]
+    imdb_votes: Optional[int]
+    tmdb_genres: Optional[str]
+    poster_path: Optional[str]
 
     class Config:
         orm_mode = True
