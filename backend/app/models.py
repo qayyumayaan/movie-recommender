@@ -40,7 +40,7 @@ class Movie(Base):
     tmdb_genres = Column(String)
     poster_path = Column(String)
 
-    embedding = Column(VECTOR(128))  # pgvector 128 dims
+    embedding = Column(Vector(128))  # pgvector 128 dims
 
     ratings = relationship("Rating", back_populates="movie", cascade="all, delete-orphan")
 
