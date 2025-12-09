@@ -138,7 +138,7 @@ def recency_weight_sql(year_col):
     """
     w = sqrt(1.025^(year - 1920))
     """
-    return func.sqrt(
+    return 0.01 * func.sqrt(
         func.pow(1.025, (year_col - 1920.0))
     )
 
@@ -156,14 +156,14 @@ def get_smart_unseen_movie(db: Session, user_id: int) -> Optional[models.Movie]:
     distance = models.Movie.embedding.cosine_distance(user_profile)
 
     # your gentle weight functions
-    # votes = cast(models.Movie.imdb_votes, Float)
-    # rating = cast(models.Movie.imdb_rating, Float)
+    votes = cast(models.Movie.imdb_votes, Float)
+    rating = cast(models.Movie.imdb_rating, Float)
 
-    # pop_w = popularity_weight_sql(votes)
-    # rating_w = rating_weight_sql(rating)
-    # recency_w = recency_weight_sql(models.Movie.startYear)
+    pop_w = popularity_weight_sql(votes)
+    rating_w = rating_weight_sql(rating)
+    recency_w = recency_weight_sql(models.Movie.startYear)
     # score = distance - pop_w - rating_w - recency_w
-    score = distance
+    score = distance - 10 * (pop_w * rating_w) - recency_w
     
 
     stmt = (
