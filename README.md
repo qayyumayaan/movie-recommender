@@ -8,8 +8,28 @@ The goal of this program is to use vector similarity searches to recommend movie
 
 The backend is written with Python and FastAPI. 
 
-To run this program, please first compile all three Docker environments. Please cd into the project root folder and run:
+To properly run this program, add your OpenAI API key in the empty template `cred.env` file in `./backend/cred.env`. You will need this to encode all text movies in the database. 
+
+Then compile all three Docker environments. Please cd into the project root folder and run:
 
 ```zsh
 docker compose up
 ```
+
+If the above doesn't work, try running this:
+```zsh
+docker compose down
+docker compose build
+docker compose up -d
+```
+
+Please enter the `backend` Docker environment and run this in the `./app` directory:
+
+```
+python -m app.scripts.initialize_db
+```
+
+It will encode all of the raw data to form the database. 
+
+
+Special thanks to The Movies Database (TMDB) and IMDB for the non-commercial use movie databases. 
