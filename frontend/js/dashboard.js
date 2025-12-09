@@ -21,14 +21,23 @@ async function fetchCurrentUserOrRedirect() {
 
 async function loadHistory() {
   const tbody = document.getElementById('history-body');
+  const summaryEl = document.getElementById('rating-summary');
   tbody.innerHTML = '';
 
   const history = await apiFetch('/movies/history', { method: 'GET' });
 
+  // If there's a summary element on the page, we will update it.
+  const hasSummary = !!summaryEl;
+
+  // Empty history
   if (!history.length) {
+    if (hasSummary) {
+      summaryEl.textContent = 'You have rated 0 movies in total, rating 0 movies Up and 0 movies Down.';
+    }
+
     const row = document.createElement('tr');
     const cell = document.createElement('td');
-    cell.colSpan = 3;
+    cell.colSpan = 4; // 4 columns: #, Movie, Rating, Rated At
     cell.textContent = 'No rated movies yet.';
     cell.classList.add('text-muted');
     row.appendChild(cell);
@@ -36,21 +45,47 @@ async function loadHistory() {
     return;
   }
 
+  // Compute statistics
+  const total = history.length;
+
+  // Treat any truthy rating as "Up",
+  // since you're already doing `item.rating ? 'Up' : 'Down'`
+  const ups = history.filter(h => !!h.rating).length;
+  const downs = total - ups;
+
+  if (hasSummary) {
+    summaryEl.textContent =
+      `You have rated ${total} movies in total, rating ${ups} movies Up and ${downs} movies Down.`;
+  }
+
+  // Ensure chronological order: latest first, highest number
+  history.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  let counter = total; // Latest movie gets the largest index
+
   for (const item of history) {
     const row = document.createElement('tr');
 
+    // Number column (chronological index)
+    const idxTd = document.createElement('td');
+    idxTd.textContent = counter--;
+
+    // Movie title
     const titleTd = document.createElement('td');
     titleTd.textContent = item.movie_title;
 
+    // Rating
     const ratingTd = document.createElement('td');
     ratingTd.innerHTML = item.rating
       ? '<span class="text-success">👍 Up</span>'
       : '<span class="text-danger">👎 Down</span>';
 
+    // Date
     const dateTd = document.createElement('td');
     const d = new Date(item.created_at);
     dateTd.textContent = d.toLocaleString();
 
+    row.appendChild(idxTd);
     row.appendChild(titleTd);
     row.appendChild(ratingTd);
     row.appendChild(dateTd);
