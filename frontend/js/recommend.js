@@ -93,8 +93,6 @@ async function loadNextMovie() {
 
     document.getElementById('movie-info').innerHTML = info;
 
-    document.getElementById('movie-info').textContent = info;
-
     setButtonsEnabled(true);
 
   } catch (err) {
