@@ -15,7 +15,7 @@ function showAlert(message, type = 'info') {
 
 function updateUnlockState() {
   const smartToggle = document.getElementById("mode-toggle");
-  const smartUnlocked = ratingCount >= 10;
+  const smartUnlocked = ratingCount >= 20;
   smartToggle.disabled = !smartUnlocked;
 
   if (smartUnlocked && !localStorage.getItem(LS_KEY_SMART_UNLOCK)) {
