@@ -2,7 +2,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import select, func
+from sqlalchemy import case, cast, Float, select, func
 
 from .. import models, schemas, auth
 from ..database import get_db
@@ -16,19 +16,48 @@ TSNE_CACHE = {}
 router = APIRouter(prefix="/movies", tags=["movies"])
 
 
+from sqlalchemy import case, cast, Float
+
 def get_random_unseen_movie(db: Session, user_id: int) -> Optional[models.Movie]:
     rated_subq = (
         select(models.Rating.movie_id).where(models.Rating.user_id == user_id)
     )
 
+    # 1. Popularty Weight:
+    votes = cast(models.Movie.imdb_votes, Float)
+    rating = cast(models.Movie.imdb_rating, Float)
+
+    popularity_weight = (
+        func.pow(votes + 1.0, 0.7) *
+        func.pow((rating / 10.0), 1.5)
+    )
+
+    # 2. Recency bias:
+    recency = case(
+        (models.Movie.startYear >= 2010, 1.3),
+        (models.Movie.startYear >= 2000, 1.1),
+        else_=1.0
+    )
+
+    weight_expr = popularity_weight * recency
+
+    # 3. Weighted random sampling:
+    #       ORDER BY -ln(random()) / weight
+    weighted_order = -func.ln(func.random()) / weight_expr
+
     stmt = (
         select(models.Movie)
         .where(models.Movie.id.not_in(rated_subq))
-        .order_by(func.random())
+
+        # 4. Exclude obscure movies entirely
+        .where(models.Movie.imdb_votes > 1000)
+
+        .order_by(weighted_order)
         .limit(1)
     )
-    result = db.execute(stmt).scalars().first()
-    return result
+
+    return db.execute(stmt).scalars().first()
+
 
 
 def compute_user_profile_vector(
@@ -85,6 +114,7 @@ def compute_user_profile_vector(
     # Normalize
     profile = [x / total_weight for x in agg]
     return profile
+
 
 
 def get_smart_unseen_movie(db: Session, user_id: int) -> Optional[models.Movie]:

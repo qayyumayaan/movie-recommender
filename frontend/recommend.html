@@ -36,30 +36,34 @@
         <div class="card shadow-sm">
           <div class="card-body">
 
-            <h5 class="card-title text-center mb-3">Your Movie</h5>
-
-            <div class="row g-4 align-items-start">
+            <div class="row g-4 align-items-stretch" style="min-height: 500px;">
 
               <div class="col-md-4 text-center">
                 <img id="movie-poster" class="img-fluid d-none" />
               </div>
 
-              <div class="col-md-8">
+              <div class="col-md-8 d-flex flex-column justify-content-between" style="display: flex;">
 
-                <p id="movie-title" class="fs-4 fw-semibold mb-3 text-center text-md-start">
-                  Loading...
-                </p>
+                <!-- CONTENT -->
+                <div class="flex-grow-1">
+                  <p id="movie-title" class="fs-3 fw-semibold mb-3 text-center text-md-start">
+                    Loading...
+                  </p>
 
-                <p id="movie-overview" class="mb-2"></p>
+                  <p id="movie-overview" class="fs-5 mb-3"></p>
 
-                <p id="movie-info" class="text-muted mb-4"></p>
-
-                <div class="d-flex justify-content-center justify-content-md-start gap-3 mb-3">
-                  <button id="btn-up" class="btn btn-success btn-lg">👍 Thumbs Up</button>
-                  <button id="btn-down" class="btn btn-danger btn-lg">👎 Thumbs Down</button>
+                  <p id="movie-info" class="text-muted fs-6 mb-4"></p>
                 </div>
 
-                <p id="status-text" class="text-muted"></p>
+                <!-- BUTTONS (pinned to bottom) -->
+                <div class="mt-auto">
+                  <div class="d-flex justify-content-center justify-content-md-start gap-3 mb-3">
+                    <button id="btn-up" class="btn btn-success btn-lg px-4">👍 Thumbs Up</button>
+                    <button id="btn-down" class="btn btn-danger btn-lg px-4">👎 Thumbs Down</button>
+                  </div>
+
+                  <p id="status-text" class="text-muted mb-0"></p>
+                </div>
 
               </div>
 
