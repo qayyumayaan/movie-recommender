@@ -138,8 +138,8 @@ def recency_weight_sql(year_col):
     """
     w = sqrt(1.025^(year - 1920))
     """
-    return 0.01 * func.sqrt(
-        func.pow(1.025, (year_col - 1920.0))
+    return 0.0003 * func.sqrt(
+        func.pow(1.09, (year_col - 1920.0))
     )
 
 def get_smart_unseen_movie(db: Session, user_id: int) -> Optional[models.Movie]:
