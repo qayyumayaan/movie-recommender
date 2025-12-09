@@ -19,7 +19,7 @@
     </div>
   </nav>
 
-  <div class="container py-5">
+  <div class="container-xxl py-5">
     <div id="alert" class="alert d-none" role="alert"></div>
 
     <div class="row justify-content-center mb-3">
@@ -32,25 +32,44 @@
     </div>
 
     <div class="row justify-content-center">
-      <div class="col-md-6">
+      <div class="col-lg-10 col-xl-9 col-12">
         <div class="card shadow-sm">
-          <div class="card-body text-center">
-            <h5 class="card-title mb-3">Your Movie</h5>
-            <p id="movie-title" class="fs-4 fw-semibold mb-4">Loading...</p>
-            <img id="movie-poster" class="img-fluid mb-3 d-none" />
-            <p id="movie-overview"></p>
-            <p id="movie-info" class="text-muted"></p>
+          <div class="card-body">
 
-            <div class="d-flex justify-content-center gap-3 mb-3">
-              <button id="btn-up" class="btn btn-success btn-lg">👍 Thumbs Up</button>
-              <button id="btn-down" class="btn btn-danger btn-lg">👎 Thumbs Down</button>
-            </div>
+            <h5 class="card-title text-center mb-3">Your Movie</h5>
 
-            <p id="status-text" class="text-muted mb-0"></p>
+            <div class="row g-4 align-items-start">
+
+              <div class="col-md-4 text-center">
+                <img id="movie-poster" class="img-fluid d-none" />
+              </div>
+
+              <div class="col-md-8">
+
+                <p id="movie-title" class="fs-4 fw-semibold mb-3 text-center text-md-start">
+                  Loading...
+                </p>
+
+                <p id="movie-overview" class="mb-2"></p>
+
+                <p id="movie-info" class="text-muted mb-4"></p>
+
+                <div class="d-flex justify-content-center justify-content-md-start gap-3 mb-3">
+                  <button id="btn-up" class="btn btn-success btn-lg">👍 Thumbs Up</button>
+                  <button id="btn-down" class="btn btn-danger btn-lg">👎 Thumbs Down</button>
+                </div>
+
+                <p id="status-text" class="text-muted"></p>
+
+              </div>
+
+            </div> <!-- row -->
+
           </div>
         </div>
       </div>
     </div>
+
   </div>
 
   <script src="js/api.js"></script>
