@@ -58,6 +58,10 @@ def get_random_unseen_movie(db: Session, user_id: int) -> Optional[models.Movie]
 
     return db.execute(stmt).scalars().first()
 
+def imdb_rating_weight(rating: float) -> float:
+    if rating is None:
+        return 1.0   # neutral weight
+    return float(np.exp(np.log(1.5) * (rating - 6)))
 
 
 def compute_user_profile_vector(
@@ -72,12 +76,7 @@ def compute_user_profile_vector(
 
     We average all (embedding * weight) to get a single vector.
     """
-    ratings = (
-        db.query(models.Rating)
-        .options(joinedload(models.Rating.movie))
-        .filter(models.Rating.user_id == user_id)
-        .all()
-    )
+    ratings = get_last_n_ratings(db, user_id, n=10)
 
     if not ratings:
         return None
@@ -115,13 +114,30 @@ def compute_user_profile_vector(
     profile = [x / total_weight for x in agg]
     return profile
 
+def get_last_n_ratings(db: Session, user_id: int, n: int = 5):
+    return (
+        db.query(models.Rating)
+        .options(joinedload(models.Rating.movie))
+        .filter(models.Rating.user_id == user_id)
+        .order_by(models.Rating.created_at.desc())
+        .limit(n)
+        .all()
+    )
+    
+def popularity_weight_sql(votes_col):
+    # 0.05 * sqrt(log(votes) / 7)
+    return 0.05 * func.sqrt(func.log(votes_col + 1) / 7.0)
+
+
+def rating_weight_sql(rating_col):
+    # convert rating range 6-10 → p = rating - 5 (range 1–5)
+    # 0.05 * sqrt(log(rating - 5) / 7)
+    return 0.05 * func.sqrt(func.exp((rating_col - 5.0)) / 500.0)
+
 
 
 def get_smart_unseen_movie(db: Session, user_id: int) -> Optional[models.Movie]:
-    """
-    Use pgvector similarity to pick the nearest unseen movie to the user's profile.
-    Falls back to None if profile cannot be computed.
-    """
+
     user_profile = compute_user_profile_vector(db, user_id)
     if user_profile is None:
         return None
@@ -130,18 +146,29 @@ def get_smart_unseen_movie(db: Session, user_id: int) -> Optional[models.Movie]:
         select(models.Rating.movie_id).where(models.Rating.user_id == user_id)
     )
 
-    # Order unseen movies by cosine distance to user_profile (lower = more similar)
-    order_clause = models.Movie.embedding.cosine_distance(user_profile)
+    # Cosine distance = similarity basis
+    distance = models.Movie.embedding.cosine_distance(user_profile)
+
+    votes = cast(models.Movie.imdb_votes, Float)
+    rating = cast(models.Movie.imdb_rating, Float)
+
+    # your gentle weight functions
+    pop_w = popularity_weight_sql(votes)
+    rating_w = rating_weight_sql(rating)
+
+    # Final hybrid scoring
+    # distance is ~0.2 - 0.4
+    # weights are ~0.00 - 0.06
+    score = distance - pop_w - rating_w
 
     stmt = (
         select(models.Movie)
         .where(models.Movie.id.not_in(rated_subq))
-        .order_by(order_clause)
+        .order_by(score.asc())
         .limit(1)
     )
 
-    result = db.execute(stmt).scalars().first()
-    return result
+    return db.execute(stmt).scalars().first()
 
 
 @router.get("/random", response_model=schemas.MovieOut)
