@@ -114,7 +114,7 @@ def compute_user_profile_vector(
     profile = [x / total_weight for x in agg]
     return profile
 
-def get_last_n_ratings(db: Session, user_id: int, n: int = 5):
+def get_last_n_ratings(db: Session, user_id: int, n: int = 15):
     return (
         db.query(models.Rating)
         .options(joinedload(models.Rating.movie))
@@ -132,9 +132,15 @@ def popularity_weight_sql(votes_col):
 def rating_weight_sql(rating_col):
     # convert rating range 6-10 → p = rating - 5 (range 1–5)
     # 0.05 * sqrt(log(rating - 5) / 7)
-    return 0.05 * func.sqrt(func.exp((rating_col - 5.0)) / 500.0)
+    return 0.05 * func.sqrt(func.exp(func.ln(5)*(rating_col - 5.0)) / 100.0) - 0.01
 
-
+def recency_weight_sql(year_col):
+    """
+    w = sqrt(1.025^(year - 1920))
+    """
+    return func.sqrt(
+        func.pow(1.025, (year_col - 1920.0))
+    )
 
 def get_smart_unseen_movie(db: Session, user_id: int) -> Optional[models.Movie]:
 
@@ -149,17 +155,16 @@ def get_smart_unseen_movie(db: Session, user_id: int) -> Optional[models.Movie]:
     # Cosine distance = similarity basis
     distance = models.Movie.embedding.cosine_distance(user_profile)
 
-    votes = cast(models.Movie.imdb_votes, Float)
-    rating = cast(models.Movie.imdb_rating, Float)
-
     # your gentle weight functions
-    pop_w = popularity_weight_sql(votes)
-    rating_w = rating_weight_sql(rating)
+    # votes = cast(models.Movie.imdb_votes, Float)
+    # rating = cast(models.Movie.imdb_rating, Float)
 
-    # Final hybrid scoring
-    # distance is ~0.2 - 0.4
-    # weights are ~0.00 - 0.06
-    score = distance - pop_w - rating_w
+    # pop_w = popularity_weight_sql(votes)
+    # rating_w = rating_weight_sql(rating)
+    # recency_w = recency_weight_sql(models.Movie.startYear)
+    # score = distance - pop_w - rating_w - recency_w
+    score = distance
+    
 
     stmt = (
         select(models.Movie)
