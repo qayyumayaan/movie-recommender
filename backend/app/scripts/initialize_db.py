@@ -2,24 +2,15 @@
 Initialize PostgreSQL movie database from TSV movie data.
 
 - Loads full movies.tsv (11k+ movies)
-- Generates OpenAI embeddings (using combined textual fields)
-- Runs PCA reduction (1536 → 128 dims) globally
-- Stores reduced vectors into Postgres (pgvector)
-- Saves PCA model for future inference
+- Loads precomputed 128-dim pgvector embeddings from TSV
+- Stores vectors directly into Postgres (pgvector)
 """
 
 import csv
 from pathlib import Path
-import os
-from math import ceil
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-
-from dotenv import load_dotenv
-import joblib
-from sklearn.decomposition import PCA
-from openai import OpenAI
 
 from app.database import SessionLocal, engine
 from app.models import Movie
@@ -27,19 +18,8 @@ from app.models import Movie
 
 # CONFIG
 TSV_PATH = Path(__file__).resolve().parents[2] / "data" / "movies.tsv"
-ENV_PATH = "./app/cred.env"
 
 print("TSV exists:", TSV_PATH.exists())
-print("ENV:", ENV_PATH)
-
-load_dotenv(ENV_PATH)
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-
-# Helper: Batch generator
-def chunk_list(lst, size):
-    for i in range(0, len(lst), size):
-        yield lst[i:i + size]
 
 
 def main():
@@ -51,83 +31,38 @@ def main():
     db: Session = SessionLocal()
 
     try:
-        # Load TSV movie data
         movies = []
+
         with TSV_PATH.open(newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter="\t")
+
             for row in reader:
                 if not row.get("title"):
                     continue
 
+                # Load 128-dim embedding
+                embedding = [
+                    float(row[f"embedding_{i}"])
+                    for i in range(128)
+                ]
+
                 movies.append({
                     "title": row["title"].strip(),
-                    "startYear": row.get("startYear"),
-                    "imdb_rating": row.get("imdb_rating"),
-                    "imdb_votes": row.get("imdb_votes"),
+                    "startYear": int(row["startYear"]) if row.get("startYear") else None,
+                    "imdb_rating": float(row["imdb_rating"]) if row.get("imdb_rating") else None,
+                    "imdb_votes": int(row["imdb_votes"]) if row.get("imdb_votes") else None,
                     "overview": row.get("overview") or "",
-                    "tagline": row.get("tagline") or "",
                     "tmdb_genres": row.get("tmdb_genres") or "",
-                    "keywords": row.get("keywords") or "",
                     "poster_path": row.get("poster_path"),
+                    "embedding": embedding,
                 })
 
         print(f"Loaded {len(movies)} movies from TSV")
 
-        # Build embedding prompts
-        print("Building embedding text for each movie...")
-
-        embedding_inputs = []
-        for m in movies:
-            text_blob = " ".join([
-                m["title"],
-                m["overview"],
-                m["tagline"],
-                m["tmdb_genres"],
-                m["keywords"]
-            ]).strip()
-
-            embedding_inputs.append(text_blob if text_blob else m["title"])
-
-        print(f"Prepared {len(embedding_inputs)} embedding inputs")
-
-        # ------------------------------
-        # BATCHED EMBEDDING GENERATION
-        # ------------------------------
-        BATCH_SIZE = 200  # safe; adjust if needed
-        num_batches = ceil(len(embedding_inputs) / BATCH_SIZE)
-
-        print(f"Generating embeddings in {num_batches} batches of {BATCH_SIZE}...")
-
-        all_embeddings = []
-
-        for idx, batch in enumerate(chunk_list(embedding_inputs, BATCH_SIZE), start=1):
-            print(f"  Batch {idx}/{num_batches}...")
-
-            response = client.embeddings.create(
-                input=batch,
-                model="text-embedding-3-small"
-            )
-
-            batch_embs = [d.embedding for d in response.data]
-            all_embeddings.extend(batch_embs)
-
-        assert len(all_embeddings) == len(movies)
-        print("All embeddings generated successfully.")
-
-        # PCA Reduction (global)
-        pca_dim = 128
-        print(f"Running PCA: original 1536 → {pca_dim}")
-
-        pca = PCA(n_components=pca_dim)
-        reduced_embs = pca.fit_transform(all_embeddings)
-
-        joblib.dump(pca, "pca_model.joblib")
-        print("Saved PCA model → pca_model.joblib")
-
-        # Insert movies with embeddings
+        # Insert movies
         print("Inserting movies into Postgres...")
 
-        for m, vec in zip(movies, reduced_embs):
+        for m in movies:
             movie = Movie(
                 title=m["title"],
                 startYear=m["startYear"],
@@ -136,7 +71,7 @@ def main():
                 overview=m["overview"],
                 tmdb_genres=m["tmdb_genres"],
                 poster_path=m["poster_path"],
-                embedding=vec.tolist()
+                embedding=m["embedding"],
             )
             db.add(movie)
 
