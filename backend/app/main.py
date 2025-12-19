@@ -4,11 +4,14 @@ from sqlalchemy import text
 
 from .database import Base, engine
 from .routers import auth_routes, movie_routes
-
+import os
 app = FastAPI(title="Movie Recommender Playground")
 
 # Frontend runs at http://localhost:8080
-origins = ["http://localhost:8080"]
+origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:8080"
+).split(",")
 
 app.add_middleware(
     CORSMiddleware,

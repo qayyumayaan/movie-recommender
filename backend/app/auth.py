@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from . import models
 
+SECURE_COOKIES = os.getenv("SECURE_COOKIES", "false").lower() == "true"
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev_secret_key_change_me")
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
@@ -43,8 +44,8 @@ def set_auth_cookie(response: Response, token: str) -> None:
         httponly=True,
         max_age=max_age,
         expires=max_age,
-        samesite="lax",
-        secure=False,  # set True if behind HTTPS in prod
+        samesite="none",
+        secure=True,
         path="/",
     )
 

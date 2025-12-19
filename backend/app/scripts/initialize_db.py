@@ -16,13 +16,13 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import OperationalError
 
-from app.database import SessionLocal, engine
+from app.database import SessionLocal, engine, Base
 from app.models import Movie
 
 
 # CONFIG
 TSV_PATH = Path(__file__).resolve().parents[2] / "data" / "movies.tsv"
-MAX_DB_WAIT_SECONDS = 60
+MAX_DB_WAIT_SECONDS = 180
 DB_RETRY_INTERVAL = 2
 
 print("TSV exists:", TSV_PATH.exists())
@@ -59,12 +59,15 @@ def main():
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
 
+    # Ensure tables exist BEFORE querying them
+    Base.metadata.create_all(bind=engine)
+
     db: Session = SessionLocal()
 
     try:
         # Idempotency guard
         if database_already_initialized(db):
-            print("Database already initialized. Skipping movie import.")
+            print("Database already initialized. Exiting init.")
             return
 
         movies = []
