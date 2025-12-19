@@ -13,6 +13,14 @@ function showAlert(message, type = 'info') {
   alertEl.classList.remove('d-none');
 }
 
+function hideAlert() {
+  const alertEl = document.getElementById('alert');
+  if (!alertEl) return;
+  alertEl.classList.add('d-none');
+  alertEl.textContent = '';
+}
+
+
 function updateUnlockState() {
   const smartToggle = document.getElementById("mode-toggle");
   const smartUnlocked = ratingCount >= 10;
@@ -154,6 +162,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     modeToggle.addEventListener('click', async () => {
       currentMode = currentMode === 'random' ? 'smart' : 'random';
       updateModeToggleUI();
+      hideAlert();
+
       await loadNextMovie();
     });
   }
