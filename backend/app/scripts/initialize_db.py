@@ -64,13 +64,16 @@ def main():
 
     db: Session = SessionLocal()
 
+    BATCH_SIZE = 500
+    total_inserted = 0
+
     try:
         # Idempotency guard
         if database_already_initialized(db):
             print("Database already initialized. Exiting init.")
             return
 
-        movies = []
+        batch = []
 
         with TSV_PATH.open(newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter="\t")
@@ -84,35 +87,36 @@ def main():
                     for i in range(128)
                 ]
 
-                movies.append({
-                    "title": row["title"].strip(),
-                    "startYear": int(row["startYear"]) if row.get("startYear") else None,
-                    "imdb_rating": float(row["imdb_rating"]) if row.get("imdb_rating") else None,
-                    "imdb_votes": int(row["imdb_votes"]) if row.get("imdb_votes") else None,
-                    "overview": row.get("overview") or "",
-                    "tmdb_genres": row.get("tmdb_genres") or "",
-                    "poster_path": row.get("poster_path"),
-                    "embedding": embedding,
-                })
+                batch.append(
+                    Movie(
+                        title=row["title"].strip(),
+                        startYear=int(row["startYear"]) if row.get("startYear") else None,
+                        imdb_rating=float(row["imdb_rating"]) if row.get("imdb_rating") else None,
+                        imdb_votes=int(row["imdb_votes"]) if row.get("imdb_votes") else None,
+                        overview=row.get("overview") or "",
+                        tmdb_genres=row.get("tmdb_genres") or "",
+                        poster_path=row.get("poster_path"),
+                        embedding=embedding,
+                    )
+                )
 
-        print(f"Loaded {len(movies)} movies from TSV")
+                
+                if len(batch) >= BATCH_SIZE:
+                    db.add_all(batch)
+                    db.commit()
+                    total_inserted += len(batch)
+                    batch.clear()
+                    db.expunge_all()
+                
+                    
+            if batch:
+                db.add_all(batch)
+                db.commit()
+                total_inserted += len(batch)
+                db.expunge_all()
 
-        print("Inserting movies into Postgres...")
 
-        for m in movies:
-            db.add(Movie(
-                title=m["title"],
-                startYear=m["startYear"],
-                imdb_rating=m["imdb_rating"],
-                imdb_votes=m["imdb_votes"],
-                overview=m["overview"],
-                tmdb_genres=m["tmdb_genres"],
-                poster_path=m["poster_path"],
-                embedding=m["embedding"],
-            ))
-
-        db.commit()
-        print(f"Inserted {len(movies)} movies into the database.")
+        print(f"Inserted {total_inserted} movies into the database.")
 
     finally:
         db.close()

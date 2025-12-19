@@ -1,7 +1,4 @@
-const API_BASE_URL =
-  window.location.hostname === 'localhost'
-    ? 'http://localhost:8000'
-    : 'https://movie-backend-380256731721.us-central1.run.app';
+const API_BASE_URL = '/api';
 
 async function apiFetch(path, options = {}) {
   const opts = {
