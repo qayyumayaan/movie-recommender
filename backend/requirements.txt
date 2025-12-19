@@ -1,7 +1,11 @@
 fastapi
-jose
+uvicorn
+python-jose[cryptography]
 numpy
-passlib
+passlib[bcrypt]
 pgvector
-pydantic
+pydantic[email]
 SQLAlchemy
+psycopg2-binary
+umap-learn
+bcrypt==3.2.2

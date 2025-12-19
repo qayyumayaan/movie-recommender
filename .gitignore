@@ -2,4 +2,10 @@
 .DS_Store
 *.gz
 *.csv
+
+# Secrets
+backend/env.yaml
+backend/cred.env
 cred.env
+.env
+.env.*
