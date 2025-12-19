@@ -3,7 +3,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 
 
-# ----- User -----
+# User
 class UserBase(BaseModel):
     username: str
     email: EmailStr
@@ -25,8 +25,7 @@ class UserOut(UserBase):
     class Config:
         orm_mode = True
 
-
-# ----- Movies & Ratings -----
+# Movies & Data
 class MovieOut(BaseModel):
     id: int
     title: str
