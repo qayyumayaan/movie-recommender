@@ -118,6 +118,11 @@ gcloud run deploy movie-backend \
   --port 8080
 ```
 
+View current projects to fill in the above: 
+```
+gcloud projects list
+```
+
 After this command builds, check if the backend is running: 
 ```
 gcloud run services describe movie-backend \
