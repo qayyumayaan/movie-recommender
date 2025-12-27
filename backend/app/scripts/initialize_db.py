@@ -2,7 +2,7 @@
 Initialize PostgreSQL movie database from TSV movie data.
 
 - Waits for Postgres to be ready
-- Loads full movies.tsv (11k+ movies)
+- Loads full movies.tsv
 - Loads precomputed 128-dim pgvector embeddings from TSV
 - Stores vectors directly into Postgres (pgvector)
 - Runs exactly once (idempotent)
@@ -64,7 +64,7 @@ def main():
 
     db: Session = SessionLocal()
 
-    BATCH_SIZE = 500
+    BATCH_SIZE = 250
     total_inserted = 0
 
     try:
