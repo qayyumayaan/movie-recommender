@@ -9,7 +9,6 @@ from ..database import get_db
 
 import numpy as np
 # from sklearn.manifold import TSNE
-import umap
 from typing import Optional, List
 TSNE_CACHE = {}  
 
@@ -317,6 +316,7 @@ def movie_space(
     )
 
     if need_rebuild:
+        import umap
         # Train UMAP one single time
         reducer = umap.UMAP(
             n_components=2,
