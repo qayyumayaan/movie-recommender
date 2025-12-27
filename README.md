@@ -38,7 +38,8 @@ First, you must create the PostgreSQL database in the backend.
 ```
 gcloud sql instances create movies-db \
   --database-version=POSTGRES_16 \
-  --tier=db-perf-optimized-N-2 \
+  --edition=ENTERPRISE
+  --tier=db-f1-micro
   --region=us-central1
 
 gcloud sql databases create movies_db --instance=movies-db
