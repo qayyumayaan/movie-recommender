@@ -16,6 +16,36 @@ I provide the vector encoded movies in the `movies.tsv` file, but to encode it y
 
 ## Local Setup
 
+In the frontend folder, please change `nginx.conf` to be exactly this: 
+
+```
+server {
+    listen 8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index login.html;
+
+    location / {
+        try_files $uri $uri/ /login.html;
+    }
+
+    location /api/ {
+        proxy_pass http://backend:8000/;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # cookies + auth
+        proxy_set_header Authorization $http_authorization;
+        proxy_pass_request_headers on;
+    }
+}
+```
+
 Compile all three Docker environments. Please cd into the project root folder and run:
 
 ```zsh
