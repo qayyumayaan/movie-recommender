@@ -57,6 +57,12 @@ server {
 
 Move `./backend/data/movies.tsv` to `./data/movies.tsv`. Create the folder if it doesn't exist. 
 
+In your `env.yaml` in the backend folder, be sure to set: 
+```yaml
+SECURE_COOKIES: 'false'
+CORS_ORIGINS: http://localhost:8080/
+```
+
 Compile all three Docker environments. Please cd into the project root folder and run:
 
 ```zsh
