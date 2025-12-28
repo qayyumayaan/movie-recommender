@@ -22,15 +22,30 @@ function hideAlert() {
 
 
 function updateUnlockState() {
-  const smartToggle = document.getElementById("mode-toggle");
-  const smartUnlocked = ratingCount >= 10;
-  smartToggle.disabled = !smartUnlocked;
+  const toggleBtn = document.getElementById("mode-toggle");
+  if (!toggleBtn) return;
 
-  if (smartUnlocked && !localStorage.getItem(LS_KEY_SMART_UNLOCK)) {
-    showAlert("Smart suggestion mode is now enabled!", "success");
-    localStorage.setItem(LS_KEY_SMART_UNLOCK, "1");
+  const smartUnlocked = ratingCount >= 10;
+
+  // Enable/disable
+  toggleBtn.disabled = !smartUnlocked;
+
+  // Text change
+  toggleBtn.textContent = smartUnlocked
+    ? "Toggle"
+    : "Rate 10 movies to unlock Smart suggestions";
+
+  // Styling
+  if (!smartUnlocked) {
+    toggleBtn.classList.remove("btn-primary");
+    toggleBtn.classList.add("btn-outline-secondary");
+  } else {
+    toggleBtn.classList.remove("btn-outline-secondary");
+    toggleBtn.classList.add("btn-primary");
   }
+
 }
+
 
 async function fetchCurrentUserOrRedirect() {
   try {
@@ -50,18 +65,10 @@ function setButtonsEnabled(enabled) {
 }
 
 function updateModeToggleUI() {
-  const btn = document.getElementById('mode-toggle');
-  if (!btn) return;
+  const label = document.getElementById('mode-label');
+  if (!label) return;
 
-  if (currentMode === 'random') {
-    btn.textContent = 'Random';
-    btn.classList.remove('btn-primary');
-    btn.classList.add('btn-outline-secondary');
-  } else {
-    btn.textContent = 'Smart';
-    btn.classList.remove('btn-outline-secondary');
-    btn.classList.add('btn-primary');
-  }
+  label.textContent = currentMode === 'random' ? 'Random' : 'Smart';
 }
 
 async function loadNextMovie() {
