@@ -22,8 +22,30 @@
   
   <link rel="icon" href="logo.ico" type="image/x-icon">
 
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const media = window.matchMedia('(prefers-color-scheme: dark)');
+
+      function applyTheme() {
+        // Follow system preference
+        root.setAttribute('data-bs-theme', media.matches ? 'dark' : 'light');
+      }
+
+      applyTheme();
+
+      // Update if the user changes OS theme while the page is open
+      if (typeof media.addEventListener === 'function') {
+        media.addEventListener('change', applyTheme);
+      } else if (typeof media.addListener === 'function') {
+        // Safari / older browsers
+        media.addListener(applyTheme);
+      }
+    })();
+  </script>
+
 </head>
-<body class="bg-light">
+<body>
   <div class="container py-5">
     <div class="row justify-content-center">
       <div class="col-md-5">

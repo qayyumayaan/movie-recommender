@@ -17,14 +17,36 @@
 
   <link rel="icon" href="logo.ico" type="image/x-icon">
 
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const media = window.matchMedia('(prefers-color-scheme: dark)');
+
+      function applyTheme() {
+        // Follow system preference
+        root.setAttribute('data-bs-theme', media.matches ? 'dark' : 'light');
+      }
+
+      applyTheme();
+
+      // Update if the user changes OS theme while the page is open
+      if (typeof media.addEventListener === 'function') {
+        media.addEventListener('change', applyTheme);
+      } else if (typeof media.addListener === 'function') {
+        // Safari / older browsers
+        media.addListener(applyTheme);
+      }
+    })();
+  </script>
+
 </head>
 
-<body class="bg-light">
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<body>
+  <nav class="navbar navbar-expand-lg bg-body-tertiary" data-bs-theme="auto">
     <div class="container-fluid">
       <a class="navbar-brand" href="dashboard.html">Movie Recommender</a>
       <div class="d-flex">
-        <a href="dashboard.html" class="btn btn-outline-light btn-sm">Dashboard</a>
+        <a href="dashboard.html" class="btn btn-outline-secondary btn-sm">Dashboard</a>
       </div>
     </div>
   </nav>
