@@ -46,6 +46,8 @@ server {
 }
 ```
 
+Move `./backend/data/movies.tsv` to `./data/movies.tsv`. Create the folder if it doesn't exist. 
+
 Compile all three Docker environments. Please cd into the project root folder and run:
 
 ```zsh
