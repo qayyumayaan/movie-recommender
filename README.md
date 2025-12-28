@@ -6,6 +6,13 @@ The app is live at https://movies.qayyumayaan.dev/ so feel free to use it.
 
 Special thanks to The Movies Database (TMDB) and IMDB for the non-commercial use movie databases. 
 
+## Development Log
+(12/27/25): Added dark mode, minor text changes, improved backend cold start performance, and reduced costs. I also changed the movies that can be recommended to give more relevant recs. Thank you all for the feedback! Please continue to send more my way. 
+
+(12/19/25): Version 1 of the site has been launched!
+
+## About
+
 There are three elements of this program: The backend, frontend, and PostgreSQL database. 
 
 The goal of this program is to use vector similarity searches to recommend movies to users. The techniques in this project are training-free, except for the embedding model. 
