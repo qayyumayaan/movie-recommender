@@ -6,7 +6,8 @@ from sqlalchemy import (
     Boolean,
     ForeignKey,
     func,
-    Float
+    Float,
+    UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
@@ -24,6 +25,7 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     ratings = relationship("Rating", back_populates="user", cascade="all, delete-orphan")
+    favorites = relationship("Favorite", back_populates="user", cascade="all, delete-orphan")
 
 
 class Movie(Base):
@@ -43,6 +45,8 @@ class Movie(Base):
     embedding = Column(Vector(128))  # pgvector 128 dims
 
     ratings = relationship("Rating", back_populates="movie", cascade="all, delete-orphan")
+    favorites = relationship("Favorite", back_populates="movie", cascade="all, delete-orphan")
+
 
 class Rating(Base):
     __tablename__ = "ratings"
@@ -55,3 +59,18 @@ class Rating(Base):
 
     user = relationship("User", back_populates="ratings")
     movie = relationship("Movie", back_populates="ratings")
+
+class Favorite(Base):
+    __tablename__ = "favorites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="favorites")
+    movie = relationship("Movie", back_populates="favorites")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "movie_id", name="uq_favorites_user_movie"),
+    )

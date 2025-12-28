@@ -37,7 +37,7 @@ async function loadHistory() {
 
     const row = document.createElement('tr');
     const cell = document.createElement('td');
-    cell.colSpan = 4; // 4 columns: #, Movie, Rating, Rated At
+    cell.colSpan = 5; // 4 columns: #, Movie, Rating, Rated At
     cell.textContent = 'No rated movies yet.';
     cell.classList.add('text-muted');
     row.appendChild(cell);
@@ -80,6 +80,40 @@ async function loadHistory() {
       ? '<span class="text-success">👍 Up</span>'
       : '<span class="text-danger">👎 Down</span>';
 
+    // Favorite
+    const favTd = document.createElement('td');
+    const favBtn = document.createElement('button');
+
+    favBtn.className = item.is_favorite
+      ? 'btn btn-sm btn-warning'
+      : 'btn btn-sm btn-outline-warning';
+
+    favBtn.textContent = item.is_favorite ? '★' : '☆';
+    favBtn.title = item.is_favorite ? 'Unfavorite' : 'Favorite';
+
+    favBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        const res = await apiFetch('/movies/favorite/toggle', {
+          method: 'POST',
+          body: JSON.stringify({ movie_id: item.movie_id }),
+        });
+
+        item.is_favorite = !!res.is_favorite;
+
+        favBtn.className = item.is_favorite
+          ? 'btn btn-sm btn-warning'
+          : 'btn btn-sm btn-outline-warning';
+        favBtn.textContent = item.is_favorite ? '★' : '☆';
+        favBtn.title = item.is_favorite ? 'Unfavorite' : 'Favorite';
+      } catch (err) {
+        showAlert(err.data?.detail || err.message, 'danger');
+      }
+    });
+
+    favTd.appendChild(favBtn);
+
+
     // Date
     const dateTd = document.createElement('td');
     const d = new Date(item.created_at);
@@ -88,6 +122,7 @@ async function loadHistory() {
     row.appendChild(idxTd);
     row.appendChild(titleTd);
     row.appendChild(ratingTd);
+    row.appendChild(favTd);
     row.appendChild(dateTd);
 
     tbody.appendChild(row);

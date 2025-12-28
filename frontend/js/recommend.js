@@ -1,6 +1,7 @@
 let currentMovieId = null;
 let currentMode = 'random'; // 'random' | 'smart'
 let ratingCount = 0;
+let currentMovieIsFavorite = false;
 
 // LocalStorage key for one-time notification
 const LS_KEY_SMART_UNLOCK = "notif_smart_unlocked";
@@ -84,6 +85,9 @@ async function loadNextMovie() {
     });
     currentMovieId = movie.id;
 
+    currentMovieIsFavorite = !!movie.is_favorite;
+    updateStarButtonUI();
+
     titleEl.textContent = movie.title;
 
     // Poster
@@ -143,6 +147,41 @@ async function sendRating(isUp) {
   }
 }
 
+function updateStarButtonUI() {
+  const btn = document.getElementById('btn-star');
+  if (!btn) return;
+
+  if (currentMovieIsFavorite) {
+    btn.classList.remove('btn-outline-warning');
+    btn.classList.add('btn-warning');
+    btn.textContent = '★ Favorited';
+  } else {
+    btn.classList.remove('btn-warning');
+    btn.classList.add('btn-outline-warning');
+    btn.textContent = '☆ Favorite';
+  }
+}
+
+async function toggleFavorite() {
+  if (!currentMovieId) return;
+
+  const statusText = document.getElementById('status-text');
+  try {
+    const res = await apiFetch('/movies/favorite/toggle', {
+      method: 'POST',
+      body: JSON.stringify({ movie_id: currentMovieId }),
+    });
+
+    currentMovieIsFavorite = !!res.is_favorite;
+    updateStarButtonUI();
+    statusText.textContent = currentMovieIsFavorite
+      ? 'Added to favorites.'
+      : 'Removed from favorites.';
+  } catch (err) {
+    showAlert(err.data?.detail || err.message, 'danger');
+  }
+}
+
 // ---- INIT ----
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -174,6 +213,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       await loadNextMovie();
     });
   }
+
+  // Favorite 
+  document.getElementById('btn-star').addEventListener('click', toggleFavorite);
 
   updateModeToggleUI();
   await loadNextMovie();

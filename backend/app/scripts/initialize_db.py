@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import OperationalError
 
 from app.database import SessionLocal, engine, Base
-from app.models import Movie
+from app.models import Movie, User, Rating, Favorite
 
 
 # CONFIG

@@ -12,6 +12,9 @@ import numpy as np
 from typing import Optional, List
 TSNE_CACHE = {}  
 
+import os
+LAST_RATINGS_N = int(os.getenv("LAST_RATINGS_N", "10"))
+
 router = APIRouter(prefix="/movies", tags=["movies"])
 
 
@@ -63,6 +66,15 @@ def imdb_rating_weight(rating: float) -> float:
     return float(np.exp(np.log(1.5) * (rating - 6)))
 
 
+def get_favorites(db: Session, user_id: int, limit: Optional[int] = None):
+    return (
+        db.query(models.Favorite)
+        .options(joinedload(models.Favorite.movie))
+        .filter(models.Favorite.user_id == user_id)
+        # .order_by(models.Favorite.movie_id.asc())  # stable, not recency-based
+        .all()
+    )
+
 def compute_user_profile_vector(
     db: Session,
     user_id: int,
@@ -75,9 +87,10 @@ def compute_user_profile_vector(
 
     We average all (embedding * weight) to get a single vector.
     """
-    ratings = get_last_n_ratings(db, user_id, n=10)
+    ratings = get_last_n_ratings(db, user_id, n=LAST_RATINGS_N)
+    favorites = get_favorites(db, user_id)
 
-    if not ratings:
+    if not ratings and not favorites:
         return None
 
     # Collect all embeddings with weights
@@ -93,6 +106,14 @@ def compute_user_profile_vector(
         weight = 1.0 if r.rating else -1.0
         weighted_vectors.append(list(emb))
         weights.append(weight)
+        
+    # Favorites contribute +1 equally
+    for f in favorites:
+        emb = f.movie.embedding
+        if emb is None:
+            continue
+        weighted_vectors.append(list(emb))
+        weights.append(1.0)
 
     if not weighted_vectors:
         return None
@@ -198,8 +219,18 @@ def next_movie(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No more unseen movies",
         )
+        
+    is_fav = (
+        db.query(models.Favorite.id)
+        .filter(models.Favorite.user_id == current_user.id, models.Favorite.movie_id == movie.id)
+        .first()
+        is not None
+    )
 
-    return movie
+    out = schemas.MovieOut.model_validate(movie, from_attributes=True)
+    out.is_favorite = is_fav
+    return out
+
 
 
 @router.post("/rate", response_model=schemas.RatingOut)
@@ -234,10 +265,23 @@ def rate_movie(
     db.commit()
     db.refresh(rating)
 
+    # NEW: include favorite status in response
+    is_fav = (
+        db.query(models.Favorite.id)
+        .filter(
+            models.Favorite.user_id == current_user.id,
+            models.Favorite.movie_id == movie.id,
+        )
+        .first()
+        is not None
+    )
+
     return schemas.RatingOut(
+        movie_id=movie.id,                 # FIX
         movie_title=movie.title,
         rating=rating.rating,
         created_at=rating.created_at,
+        is_favorite=is_fav,                # FIX (optional but consistent)
     )
 
 
@@ -254,11 +298,21 @@ def get_history(
         .all()
     )
 
+    fav_ids = {
+        mid for (mid,) in (
+            db.query(models.Favorite.movie_id)
+            .filter(models.Favorite.user_id == current_user.id)
+            .all()
+        )
+    }
+
     return [
         schemas.RatingOut(
+            movie_id=r.movie.id,
             movie_title=r.movie.title,
             rating=r.rating,
             created_at=r.created_at,
+            is_favorite=(r.movie.id in fav_ids),
         )
         for r in ratings
     ]
@@ -421,4 +475,69 @@ def movie_influence(
 
     # Return top 5
     return positive_influences[:5]
+
+
+@router.post("/favorite/toggle")
+def toggle_favorite(
+    payload: schemas.FavoriteToggleIn,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    movie = db.query(models.Movie).filter(models.Movie.id == payload.movie_id).first()
+    if not movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+
+    existing = (
+        db.query(models.Favorite)
+        .filter(
+            models.Favorite.user_id == current_user.id,
+            models.Favorite.movie_id == payload.movie_id,
+        )
+        .first()
+    )
+
+    if existing:
+        db.delete(existing)
+        db.commit()
+        return {"movie_id": payload.movie_id, "is_favorite": False}
+
+    # # enforce limit server-side (configurable)
+    # fav_count = (
+    #     db.query(func.count(models.Favorite.id))
+    #     .filter(models.Favorite.user_id == current_user.id)
+    #     .scalar()
+    # )
+    # if fav_count >= MAX_FAVORITES:
+    #     raise HTTPException(
+    #         status_code=400,
+    #         detail=f"Favorite limit reached ({MAX_FAVORITES}). Unstar something first.",
+    #     )
+
+    fav = models.Favorite(user_id=current_user.id, movie_id=payload.movie_id)
+    db.add(fav)
+    db.commit()
+    return {"movie_id": payload.movie_id, "is_favorite": True}
+
+# List all favorites. Don't need now but can use later
+@router.get("/favorites", response_model=list[schemas.FavoriteOut])
+def list_favorites(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    favs = (
+        db.query(models.Favorite)
+        .options(joinedload(models.Favorite.movie))
+        .filter(models.Favorite.user_id == current_user.id)
+        .order_by(models.Favorite.created_at.desc())
+        .all()
+    )
+
+    return [
+        schemas.FavoriteOut(
+            movie_id=f.movie.id,
+            movie_title=f.movie.title,
+            created_at=f.created_at,
+        )
+        for f in favs
+    ]
 

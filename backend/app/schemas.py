@@ -1,10 +1,13 @@
 from datetime import datetime
 from pydantic import BaseModel, EmailStr
+from pydantic.config import ConfigDict
 from typing import Optional
 
 
 # User
 class UserBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     username: str
     email: EmailStr
 
@@ -22,11 +25,10 @@ class UserOut(UserBase):
     id: int
     created_at: datetime
 
-    class Config:
-        orm_mode = True
-
 # Movies & Data
 class MovieOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     title: str
     overview: Optional[str]
@@ -35,9 +37,8 @@ class MovieOut(BaseModel):
     imdb_votes: Optional[int]
     tmdb_genres: Optional[str]
     poster_path: Optional[str]
-
-    class Config:
-        orm_mode = True
+    
+    is_favorite: bool = False
 
 
 class RatingCreate(BaseModel):
@@ -46,9 +47,21 @@ class RatingCreate(BaseModel):
 
 
 class RatingOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    movie_id: int
     movie_title: str
     rating: bool
     created_at: datetime
+    is_favorite: bool = False
 
-    class Config:
-        orm_mode = True
+class FavoriteToggleIn(BaseModel):
+    movie_id: int
+
+
+class FavoriteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    movie_id: int
+    movie_title: str
+    created_at: datetime

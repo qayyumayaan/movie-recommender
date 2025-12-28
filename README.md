@@ -7,6 +7,8 @@ The app is live at https://movies.qayyumayaan.dev/ so feel free to use it.
 Special thanks to The Movies Database (TMDB) and IMDB for the non-commercial use movie databases. 
 
 ## Development Log
+(12/27/25): Added a 'Favorites' feature. Star your favorite movies to better improve future recommendations. 
+
 (12/27/25): Added dark mode, minor text changes, improved backend cold start performance, and reduced costs. I also changed the movies that can be recommended to give more relevant recs. Thank you all for the feedback! Please continue to send more my way. 
 
 (12/19/25): Version 1 of the site has been launched!
@@ -153,7 +155,7 @@ gcloud run deploy movie-backend \
   --source ./backend \
   --region us-central1 \
   --allow-unauthenticated \
-  --add-cloudsql-instances <your-project-name>:us-central1:movies-db \
+  --add-cloudsql-instances centered-inn-471816-j1:us-central1:movies-db \
   --env-vars-file backend/env.yaml \
   --port 8080
 ```
