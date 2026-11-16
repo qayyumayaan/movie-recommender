@@ -48,16 +48,15 @@
     <div class="container-fluid">
       <span class="navbar-brand">Movie Recommender</span>
       <div class="d-flex">
-        <button id="btn-logout" class="btn btn-outline-secondary btn-sm">Logout</button>
+        <button id="btn-logout" class="btn btn-outline-secondary btn-sm">Log out of this device</button>
       </div>
     </div>
   </nav>
 
   <div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
       <div>
         <h3>Dashboard</h3>
-        <p id="user-info" class="text-muted mb-0"></p>
       </div>
       <div>
         <a href="recommend.html" class="btn btn-primary me-2">Get Recommendation</a>
@@ -66,6 +65,24 @@
     </div>
 
     <div id="alert" class="alert d-none" role="alert"></div>
+
+    <div class="card mb-4">
+      <div class="card-body">
+        <h5 class="card-title">Your profile code</h5>
+        <p class="text-muted small mb-2">
+          This is your login. Paste it on the start page of any device to restore your taste. It changes as you rate.
+        </p>
+        <input id="profile-code" class="form-control font-monospace mb-2" readonly
+               aria-label="Profile code" onclick="this.select()">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <button id="btn-copy-code" class="btn btn-sm btn-outline-primary">Copy code</button>
+          <button id="btn-copy-link" class="btn btn-sm btn-outline-secondary">Copy resume link</button>
+          <span id="copy-status" class="small text-success" aria-live="polite"></span>
+        </div>
+        <p id="code-note" class="small text-muted mt-2 mb-0"></p>
+      </div>
+    </div>
+
     <p id="rating-summary" class="fw-semibold mb-3"></p>
 
 
@@ -92,7 +109,7 @@
     </div>
   </div>
 
-  <script src="js/api.js"></script>
+  <script src="js/store.js"></script>
   <script src="js/dashboard.js"></script>
 </body>
 </html>

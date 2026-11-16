@@ -6,65 +6,55 @@ function showAlert(message, type = 'danger') {
   alertEl.classList.remove('d-none');
 }
 
-function setLoginStatus(isLoading) {
-  const el = document.getElementById('login-status');
-  if (!el) return;
-  el.classList.toggle('d-none', !isLoading);
-}
-
-
-async function handleRegister() {
-  const email = document.getElementById('email').value.trim();
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value.trim();
-
-  if (!email || !username || !password) {
-    showAlert('Please fill in all fields.');
-    return;
-  }
-
+function handleResume(e) {
+  e.preventDefault();
+  const code = document.getElementById('code').value;
   try {
-    setLoginStatus(true); 
-    await apiFetch('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ email, username, password }),
-    });
-    // registration also logs in; go to dashboard
-    window.location.href = 'dashboard.html';
+    const profile = MovieStore.decodeCode(code);
+    if (!MovieStore.saveProfile(profile)) {
+      showAlert('This browser is blocking local storage, so your profile cannot be saved here.');
+      return;
+    }
+    window.location.href = 'recommend.html';
   } catch (err) {
-    showAlert(err.data?.detail || err.message);
+    showAlert(err.message);
   }
 }
 
-async function handleLogin() {
-  const email = document.getElementById('email').value.trim();
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value.trim();
-
-  if (!password || (!email && !username)) {
-    showAlert('Please provide username/email and password.');
+function handleNew() {
+  const existing = MovieStore.loadProfile();
+  if (existing && existing.history.length &&
+      !confirm('Start fresh? This erases the history saved on this device. Copy your profile code from the Dashboard first if you want to keep it.')) {
     return;
   }
-
-  const username_or_email = email || username;
-
-  try {
-    setLoginStatus(true); 
-    await apiFetch('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ username_or_email, password }),
-    });
-    window.location.href = 'dashboard.html';
-  } catch (err) {
-    setLoginStatus(false);
-    showAlert(err.data?.detail || err.message);
+  if (!MovieStore.newProfile()) {
+    showAlert('This browser is blocking local storage, so your profile cannot be saved here.');
+    return;
   }
+  window.location.href = 'recommend.html';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const btnLogin = document.getElementById('btn-login');
-  const btnRegister = document.getElementById('btn-register');
+  const existing = MovieStore.loadProfile();
+  if (existing) {
+    document.getElementById('continue-count').textContent = existing.history.length;
+    document.getElementById('continue-block').classList.remove('d-none');
+  }
 
-  if (btnLogin) btnLogin.addEventListener('click', handleLogin);
-  if (btnRegister) btnRegister.addEventListener('click', handleRegister);
+  const codeInput = document.getElementById('code');
+  codeInput.addEventListener('input', () => {
+    const show = !!(existing && existing.history.length && codeInput.value.trim());
+    document.getElementById('resume-warning').classList.toggle('d-none', !show);
+  });
+
+  // Resume links look like index.html#code=XXXX
+  const match = window.location.hash.match(/code=([A-Za-z0-9_-]+)/);
+  if (match) {
+    codeInput.value = match[1];
+    codeInput.dispatchEvent(new Event('input'));
+    history.replaceState(null, '', window.location.pathname);
+  }
+
+  document.getElementById('resume-form').addEventListener('submit', handleResume);
+  document.getElementById('btn-new').addEventListener('click', handleNew);
 });

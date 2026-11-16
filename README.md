@@ -6,6 +6,30 @@ The app is live at https://movies.qayyumayaan.dev/ so feel free to use it.
 
 Special thanks to The Movies Database (TMDB) and IMDB for the non-commercial use movie databases. 
 
+## Static version (GitHub Pages)
+
+The app now runs entirely in the browser. There is no backend, database, or account system.
+
+- **Data:** `frontend/data/movies.json` (metadata) and `frontend/data/embeddings.bin` (128-d float32 embeddings) are generated from `backend/data/movies.tsv` by `python3 scripts/build_static_data.py`.
+- **Recommendations:** `frontend/js/store.js` ports the backend's Random (weighted sampling) and Smart (cosine distance to the taste vector + popularity/rating/recency) scoring to JavaScript.
+- **Profiles:** ratings are kept in `localStorage` (the 2,048 most recent). The Dashboard shows a **64-character profile code**, which is the login. Pasting it on the start page (or opening `index.html#code=...`) restores the user's taste on any device.
+
+### Profile code format
+
+48 bytes encoded as base64url, which is exactly 64 characters:
+
+| Bits | Field |
+|---|---|
+| 4 | version (`1`) |
+| 26 × 14 | entries, newest first: slot+1 (12 bits, 0 = empty), liked (1), favorite (1) |
+| 16 | CRC-16/CCITT-FALSE of the preceding 46 bytes (catches typos) |
+
+The code stores the last 10 ratings, then favorites, then the most recent remaining ratings. That's exactly what the taste vector is built from. A movie's **slot** is its index in `movies.json`. The build script keeps existing slots and only appends new movies, so old codes stay valid. Never reorder or delete entries by hand. There is room for 4,095 slots.
+
+### Deploying
+
+`.github/workflows/pages.yml` publishes the `frontend/` folder. In the repo, go to **Settings → Pages → Source** and choose **GitHub Actions**. To preview locally, run `cd frontend && python3 -m http.server`.
+
 ## Development Log
 (12/27/25): Added a 'Favorites' feature. Star your favorite movies to better improve future recommendations. 
 
@@ -126,6 +150,20 @@ brew link --force postgresql@16
 psql --version
 ```
 
+(12/27/25) I had to run these commands to make the Favorites table when I added that feature in but I don't know if this is necessary: 
+
+```SQL
+CREATE TABLE favorites (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  movie_id INTEGER NOT NULL REFERENCES movies(id) ON DELETE CASCADE,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_favorites_user_movie UNIQUE (user_id, movie_id)
+);
+
+CREATE INDEX ix_favorites_user_id ON favorites(user_id);
+CREATE INDEX ix_favorites_movie_id ON favorites(movie_id);
+```
 
 #### Deploy Backend
 
@@ -341,3 +379,17 @@ To clean up and once everything works, you can increase the TTL to something hig
 
 
 #### You're done!
+
+
+
+(1/5/26) I realized my cloud costs were still unsustainably high. The next step is to get rid of the HTTPS load balancer for my custom domain and just do direct domain mapping. This needs me to adjust my code a bit. 
+
+In `api.js`, the original value was this: 
+```javascript
+const API_BASE_URL = '/api';
+```
+
+But now I must set it to this: 
+```javascript
+const API_BASE_URL = 'https://api.movies.qayyumayaan.dev';
+```

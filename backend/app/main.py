@@ -1,13 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
-
-from .database import Base, engine
-from .routers import auth_routes, movie_routes
+from fastapi.responses import JSONResponse
 import os
+
 app = FastAPI(title="Movie Recommender Playground")
 
-# Frontend runs at http://localhost:8080
 origins = os.getenv(
     "CORS_ORIGINS",
     "http://localhost:8080"
@@ -15,20 +12,15 @@ origins = os.getenv(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,      # cannot be "*" if using credentials (cookies)
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-@app.on_event("startup")
-def on_startup():
-    # Ensure pgvector extension and tables exist
-    with engine.begin() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-    Base.metadata.create_all(bind=engine)
+SHUTDOWN_MESSAGE = {"detail": "The project has shut down. Thank you for using it!"}
 
 
-app.include_router(auth_routes.router)
-app.include_router(movie_routes.router)
+@app.middleware("http")
+async def shutdown_middleware(request: Request, call_next):
+    return JSONResponse(status_code=503, content=SHUTDOWN_MESSAGE)

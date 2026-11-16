@@ -1,3 +1,6 @@
+let profile = null;
+let movies = [];
+
 function showAlert(message, type = 'info') {
   const alertEl = document.getElementById('alert');
   if (!alertEl) return;
@@ -6,38 +9,49 @@ function showAlert(message, type = 'info') {
   alertEl.classList.remove('d-none');
 }
 
-async function fetchCurrentUserOrRedirect() {
-  try {
-    const user = await apiFetch('/auth/me', { method: 'GET' });
-    return user;
-  } catch (err) {
-    if (err.status === 401) {
-      window.location.href = 'login.html';
-      return null;
-    }
-    throw err;
+function renderCode() {
+  document.getElementById('profile-code').value = MovieStore.encodeCode(profile);
+
+  const favs = profile.history.filter(h => h.f).length;
+  const notes = [];
+  if (profile.history.length > MovieStore.CODE_ENTRIES) {
+    notes.push(`The code holds your ${MovieStore.LAST_RATINGS_N} latest ratings plus favorites (${MovieStore.CODE_ENTRIES} movies in total). That's everything the recommender needs. Your full history of up to ${MovieStore.MAX_HISTORY} movies stays on this device.`);
   }
+  if (favs > MovieStore.CODE_ENTRIES - MovieStore.LAST_RATINGS_N) {
+    notes.push(`You have ${favs} favorites. Only the newest ${MovieStore.CODE_ENTRIES - MovieStore.LAST_RATINGS_N} or so fit in the code.`);
+  }
+  document.getElementById('code-note').textContent = notes.join(' ');
 }
 
-async function loadHistory() {
+async function copy(text) {
+  const status = document.getElementById('copy-status');
+  const ok = await MovieStore.copyText(text);
+  status.textContent = ok ? 'Copied!' : 'Copy failed. Select the code and copy it manually.';
+  status.className = `small ${ok ? 'text-success' : 'text-danger'}`;
+  setTimeout(() => { status.textContent = ''; }, 2500);
+}
+
+function setFavButton(btn, isFav) {
+  btn.className = isFav ? 'btn btn-sm btn-warning' : 'btn btn-sm btn-outline-warning';
+  btn.textContent = isFav ? '★' : '☆';
+  btn.title = isFav ? 'Unfavorite' : 'Favorite';
+}
+
+function loadHistory() {
   const tbody = document.getElementById('history-body');
   const summaryEl = document.getElementById('rating-summary');
   tbody.innerHTML = '';
 
-  const history = await apiFetch('/movies/history', { method: 'GET' });
+  const history = profile.history;
+  const total = history.length;
+  const ups = history.filter(h => h.r).length;
+  summaryEl.textContent =
+    `You have rated ${total} movies in total, rating ${ups} movies Up and ${total - ups} movies Down.`;
 
-  // If there's a summary element on the page, we will update it.
-  const hasSummary = !!summaryEl;
-
-  // Empty history
-  if (!history.length) {
-    if (hasSummary) {
-      summaryEl.textContent = 'You have rated 0 movies in total, rating 0 movies Up and 0 movies Down.';
-    }
-
+  if (!total) {
     const row = document.createElement('tr');
     const cell = document.createElement('td');
-    cell.colSpan = 5; // 4 columns: #, Movie, Rating, Rated At
+    cell.colSpan = 5;
     cell.textContent = 'No rated movies yet.';
     cell.classList.add('text-muted');
     row.appendChild(cell);
@@ -45,112 +59,71 @@ async function loadHistory() {
     return;
   }
 
-  // Compute statistics
-  const total = history.length;
-
-  // Treat any truthy rating as "Up",
-  // since you're already doing `item.rating ? 'Up' : 'Down'`
-  const ups = history.filter(h => !!h.rating).length;
-  const downs = total - ups;
-
-  if (hasSummary) {
-    summaryEl.textContent =
-      `You have rated ${total} movies in total, rating ${ups} movies Up and ${downs} movies Down.`;
-  }
-
-  // Ensure chronological order: latest first, highest number
-  history.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-  let counter = total; // Latest movie gets the largest index
-
+  let counter = total; // latest movie gets the largest index
   for (const item of history) {
     const row = document.createElement('tr');
 
-    // Number column (chronological index)
     const idxTd = document.createElement('td');
     idxTd.textContent = counter--;
 
-    // Movie title
     const titleTd = document.createElement('td');
-    titleTd.textContent = item.movie_title;
+    titleTd.textContent = movies[item.s]?.title ?? `(movie no longer available)`;
 
-    // Rating
     const ratingTd = document.createElement('td');
-    ratingTd.innerHTML = item.rating
+    ratingTd.innerHTML = item.r
       ? '<span class="text-success">👍 Up</span>'
       : '<span class="text-danger">👎 Down</span>';
 
-    // Favorite
     const favTd = document.createElement('td');
     const favBtn = document.createElement('button');
-
-    favBtn.className = item.is_favorite
-      ? 'btn btn-sm btn-warning'
-      : 'btn btn-sm btn-outline-warning';
-
-    favBtn.textContent = item.is_favorite ? '★' : '☆';
-    favBtn.title = item.is_favorite ? 'Unfavorite' : 'Favorite';
-
-    favBtn.addEventListener('click', async (e) => {
+    setFavButton(favBtn, item.f);
+    favBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      try {
-        const res = await apiFetch('/movies/favorite/toggle', {
-          method: 'POST',
-          body: JSON.stringify({ movie_id: item.movie_id }),
-        });
-
-        item.is_favorite = !!res.is_favorite;
-
-        favBtn.className = item.is_favorite
-          ? 'btn btn-sm btn-warning'
-          : 'btn btn-sm btn-outline-warning';
-        favBtn.textContent = item.is_favorite ? '★' : '☆';
-        favBtn.title = item.is_favorite ? 'Unfavorite' : 'Favorite';
-      } catch (err) {
-        showAlert(err.data?.detail || err.message, 'danger');
-      }
+      const isFav = MovieStore.toggleFavorite(profile, item.s);
+      setFavButton(favBtn, !!isFav);
+      renderCode();
     });
-
     favTd.appendChild(favBtn);
 
-
-    // Date
     const dateTd = document.createElement('td');
-    const d = new Date(item.created_at);
-    dateTd.textContent = d.toLocaleString();
+    dateTd.textContent = item.t ? new Date(item.t).toLocaleString() : 'Restored from code';
+    if (!item.t) dateTd.classList.add('text-muted');
 
-    row.appendChild(idxTd);
-    row.appendChild(titleTd);
-    row.appendChild(ratingTd);
-    row.appendChild(favTd);
-    row.appendChild(dateTd);
-
+    row.append(idxTd, titleTd, ratingTd, favTd, dateTd);
     tbody.appendChild(row);
   }
 }
 
-async function resetHistory() {
-  if (!confirm('Reset your entire rating history?')) return;
-  await apiFetch('/movies/history/reset', { method: 'POST' });
+function resetHistory() {
+  if (!confirm('Reset your entire rating history? Your current profile code will stop matching this device.')) return;
+  profile = MovieStore.newProfile();
   showAlert('History reset.', 'warning');
-  await loadHistory();
+  renderCode();
+  loadHistory();
 }
 
-async function logout() {
-  await apiFetch('/auth/logout', { method: 'POST' });
-  window.location.href = 'login.html';
+function logout() {
+  if (!confirm('Log out of this device? Your history here will be erased. Make sure you have copied your profile code first.')) return;
+  MovieStore.clearProfile();
+  window.location.href = 'index.html';
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const user = await fetchCurrentUserOrRedirect();
-  if (!user) return;
-
-  // Show user info
-  const userInfo = document.getElementById('user-info');
-  userInfo.textContent = `${user.username} (${user.email})`;
+  profile = MovieStore.requireProfile();
+  if (!profile) return;
 
   document.getElementById('btn-reset').addEventListener('click', resetHistory);
   document.getElementById('btn-logout').addEventListener('click', logout);
+  document.getElementById('btn-copy-code').addEventListener('click',
+    () => copy(MovieStore.encodeCode(profile)));
+  document.getElementById('btn-copy-link').addEventListener('click',
+    () => copy(MovieStore.resumeLink(MovieStore.encodeCode(profile))));
 
-  await loadHistory();
+  renderCode();
+  try {
+    movies = (await MovieStore.loadMovies()).movies;
+  } catch (err) {
+    showAlert(err.message, 'danger');
+  }
+  loadHistory();
 });

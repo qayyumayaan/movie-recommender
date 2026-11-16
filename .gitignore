@@ -1,11 +1,18 @@
 .venv/*
 .DS_Store
 *.gz
-*.csv
+# *.csv
 
 # Secrets
+backend/app/env.yaml
 backend/env.yaml
 backend/cred.env
 cred.env
 .env
 .env.*
+data/movies.tsv
+raw_data/movies_11k.tsv
+nginx.conf
+env.yaml
+backend/env.yaml
+env.yaml
